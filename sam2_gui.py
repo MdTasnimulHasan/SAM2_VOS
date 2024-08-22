@@ -1,8 +1,3 @@
-import tkinter as tk
-from tkinter import filedialog
-from PIL import Image, ImageTk, ImageDraw
-import os
-
 
 import tkinter as tk
 from tkinter import filedialog
@@ -18,7 +13,8 @@ class ImageBrowser:
         self.image_list = []
         self.current_image_index = 0
         self.select_mode = False  # Mode to select pixels
-        self.clicked_positions = []  # List to keep track of clicked positions
+        self.red_dot_mode = False  # Mode to draw red dots
+        self.clicked_positions = {}  # Dictionary to store clicked positions per image
         
         # Create a frame for the image and buttons
         self.image_frame = tk.Frame(root)
@@ -35,9 +31,12 @@ class ImageBrowser:
         self.path_label = tk.Label(self.image_frame, text="", wraplength=400)
         self.path_label.pack()
 
-        # Create a button to select pixels
+        # Create buttons for pixel selection
         self.select_pixel_button = tk.Button(self.button_frame, text="Select Pixel", command=self.toggle_select_mode)
         self.select_pixel_button.pack(pady=5)
+
+        self.red_dot_button = tk.Button(self.button_frame, text="Red Dot Mode", command=self.toggle_red_dot_mode)
+        self.red_dot_button.pack(pady=5)
 
         # Create a label to show pixel coordinates
         self.coord_label = tk.Label(self.button_frame, text="", wraplength=200)
@@ -66,40 +65,55 @@ class ImageBrowser:
         else:
             self.select_pixel_button.config(relief=tk.RAISED)
 
+    def toggle_red_dot_mode(self):
+        self.red_dot_mode = not self.red_dot_mode
+        if self.red_dot_mode:
+            self.red_dot_button.config(relief=tk.SUNKEN)
+        else:
+            self.red_dot_button.config(relief=tk.RAISED)
+
     def select_folder(self):
         folder_path = filedialog.askdirectory()
         if folder_path:
             self.image_list = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.lower().endswith(('png', 'jpg', 'jpeg', 'gif', 'bmp'))]
             self.current_image_index = 0
-            self.clicked_positions = []  # Reset positions when a new folder is selected
+            self.clicked_positions = {}  # Reset clicked positions when a new folder is selected
             if self.image_list:
                 self.show_image()
 
     def show_image(self):
         if self.image_list:
             img_path = self.image_list[self.current_image_index]
-            img = Image.open(img_path)
-            img = img.resize((512, 512), Image.ANTIALIAS)
-            self.original_img = img.copy()  # Keep the original image
-            self.img = img
-            self.tk_img = ImageTk.PhotoImage(img)
+            self.original_img = Image.open(img_path)  # Keep the original image
+            self.original_img = self.original_img.resize((512, 512), Image.ANTIALIAS)
+            self.img = self.original_img.copy()  # Work with a copy of the original image
+            self.tk_img = ImageTk.PhotoImage(self.img)
             self.label.config(image=self.tk_img)
             self.label.image = self.tk_img
             self.path_label.config(text=img_path)  # Update the path label with the current image path
             
-            # Redraw all clicked positions
+            # Clear dots for new image and redraw
+            self.clicked_positions[img_path] = {'blue': [], 'red': []}
             self.redraw_clicked_positions()
 
     def redraw_clicked_positions(self):
-        # Create a drawing object
-        img_draw = ImageDraw.Draw(self.original_img)
+        if not self.image_list:
+            return
 
-        # Draw all stored clicked positions
-        for (x, y) in self.clicked_positions:
+        img_path = self.image_list[self.current_image_index]
+        img_with_dots = self.original_img.copy()
+        img_draw = ImageDraw.Draw(img_with_dots)
+
+        # Draw all stored blue positions
+        for (x, y) in self.clicked_positions[img_path]['blue']:
             img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="blue")
 
+        # Draw all stored red positions
+        for (x, y) in self.clicked_positions[img_path]['red']:
+            img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="red")
+
         # Update the image with all dots
-        self.img = self.original_img.resize((512, 512), Image.ANTIALIAS)
+        self.img = img_with_dots
         self.tk_img = ImageTk.PhotoImage(self.img)
         self.label.config(image=self.tk_img)
         self.label.image = self.tk_img
@@ -115,7 +129,7 @@ class ImageBrowser:
             self.show_image()
 
     def on_image_click(self, event):
-        if self.select_mode and self.image_list:
+        if self.image_list:
             x = event.x
             y = event.y
 
@@ -125,28 +139,46 @@ class ImageBrowser:
             orig_x = int(x * scale_x)
             orig_y = int(y * scale_y)
 
-            # Add the position to the list
-            self.clicked_positions.append((orig_x, orig_y))
+            img_path = self.image_list[self.current_image_index]
+            
+            # Initialize position lists if not already done
+            if img_path not in self.clicked_positions:
+                self.clicked_positions[img_path] = {'blue': [], 'red': []}
+
+            # Add the position to the list based on the current mode
+            if self.red_dot_mode:
+                self.clicked_positions[img_path]['red'].append((orig_x, orig_y))
+            elif self.select_mode:
+                self.clicked_positions[img_path]['blue'].append((orig_x, orig_y))
 
             # Draw all dots
             self.redraw_clicked_positions()
 
             # Show the coordinates of all clicked pixels
-            coords_text = "\n".join([f"({px}, {py})" for px, py in self.clicked_positions])
+            coords_text = "\n".join([f"Blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['blue']] +
+                                    [f"Red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['red']])
             self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
 
     def on_image_right_click(self, event):
-        if self.select_mode and self.clicked_positions:
-            # Remove the last clicked position
-            self.clicked_positions.pop()
+        if self.image_list:
+            img_path = self.image_list[self.current_image_index]
 
-            # Redraw the image with the remaining clicked positions
-            self.redraw_clicked_positions()
+            if self.red_dot_mode and self.clicked_positions.get(img_path, {}).get('red'):
+                # Remove the last red clicked position
+                self.clicked_positions[img_path]['red'].pop()
+                self.redraw_clicked_positions()
+                coords_text = "\n".join([f"Blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['blue']] +
+                                        [f"Red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['red']])
+                self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
 
-            # Update the coordinates label
-            coords_text = "\n".join([f"({px}, {py})" for px, py in self.clicked_positions])
-            self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
-
+            elif self.select_mode and self.clicked_positions.get(img_path, {}).get('blue'):
+                # Remove the last blue clicked position
+                self.clicked_positions[img_path]['blue'].pop()
+                self.redraw_clicked_positions()
+                coords_text = "\n".join([f"Blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['blue']] +
+                                        [f"Red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['red']])
+                self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
+                
 # Set up the main application window
 root = tk.Tk()
 app = ImageBrowser(root)
