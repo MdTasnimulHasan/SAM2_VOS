@@ -12,7 +12,7 @@ class ImageBrowser:
         # Set up initial variables
         self.image_list = []
         self.current_image_index = 0
-        self.select_mode = False  # Mode to select pixels
+        self.hand_select_mode = False  # Mode to select pixels
         self.remove_hand_mode = False  # Mode to draw remove hand red dots
         self.clicked_positions = {}  # Dictionary to store clicked positions per image
         
@@ -59,8 +59,8 @@ class ImageBrowser:
         self.label.bind("<Button-3>", self.on_image_right_click)  # Bind right mouse click to the image
 
     def toggle_hand_select_mode(self):
-        self.select_mode = not self.select_mode
-        if self.select_mode:
+        self.hand_select_mode = not self.hand_select_mode
+        if self.hand_select_mode:
             self.select_hand_button.config(relief=tk.SUNKEN)
         else:
             self.select_hand_button.config(relief=tk.RAISED)
@@ -161,7 +161,7 @@ class ImageBrowser:
             # Add the position to the list based on the current mode
             if self.remove_hand_mode:
                 self.clicked_positions[img_path]['hand_red'].append((orig_x, orig_y))
-            elif self.select_mode:
+            elif self.hand_select_mode:
                 self.clicked_positions[img_path]['hand_blue'].append((orig_x, orig_y))
 
             # Draw all dots
@@ -184,7 +184,7 @@ class ImageBrowser:
                                         [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']])
                 self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
 
-            elif self.select_mode and self.clicked_positions.get(img_path, {}).get('hand_blue'):
+            elif self.hand_select_mode and self.clicked_positions.get(img_path, {}).get('hand_blue'):
                 # Remove the last blue clicked position
                 self.clicked_positions[img_path]['hand_blue'].pop()
                 self.redraw_clicked_positions()
