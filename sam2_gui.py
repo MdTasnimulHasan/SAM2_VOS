@@ -12,8 +12,13 @@ class ImageBrowser:
         # Set up initial variables
         self.image_list = []
         self.current_image_index = 0
-        self.hand_select_mode = False  # Mode to select pixels
+
+        self.hand_select_mode = False  # Mode to select hand blue dot  pixels
         self.remove_hand_mode = False  # Mode to draw remove hand red dots
+
+        self.obj_select_mode = False  # Mode to select hand blue dot  pixels
+        self.remove_obj_mode = False  # Mode to draw remove hand red dots
+
         self.clicked_positions = {}  # Dictionary to store clicked positions per image
         
         # Create a frame for the image and buttons
@@ -37,6 +42,12 @@ class ImageBrowser:
 
         self.remove_hand_button = tk.Button(self.button_frame, text="Remove Hand Pixel", command=self.toggle_hand_remove_mode)
         self.remove_hand_button.pack(pady=5)
+
+        self.select_obj_button = tk.Button(self.button_frame, text="Select Object Pixel", command=self.toggle_obj_select_mode)
+        self.select_obj_button.pack(pady=5)
+
+        self.remove_obj_button = tk.Button(self.button_frame, text="Remove Object Pixel", command=self.toggle_obj_remove_mode)
+        self.remove_obj_button.pack(pady=5)
 
         # Create a label to show pixel coordinates
         self.coord_label = tk.Label(self.button_frame, text="", wraplength=200)
@@ -72,6 +83,20 @@ class ImageBrowser:
         else:
             self.remove_hand_button.config(relief=tk.RAISED)
 
+    def toggle_obj_select_mode(self):
+        self.obj_select_mode = not self.obj_select_mode
+        if self.obj_select_mode:
+            self.select_obj_button.config(relief=tk.SUNKEN)
+        else:
+            self.select_obj_button.config(relief=tk.RAISED)
+
+    def toggle_obj_remove_mode(self):
+        self.remove_obj_mode = not self.remove_obj_mode
+        if self.remove_obj_mode:
+            self.remove_obj_button.config(relief=tk.SUNKEN)
+        else:
+            self.remove_obj_button.config(relief=tk.RAISED)
+
     def select_folder(self):
         folder_path = filedialog.askdirectory()
         if folder_path:
@@ -93,7 +118,7 @@ class ImageBrowser:
             self.path_label.config(text=img_path)  # Update the path label with the current image path
             
             # Clear dots for new image and redraw
-            self.clicked_positions[img_path] = {'hand_blue': [], 'hand_red': []}
+            self.clicked_positions[img_path] = {'hand_blue': [], 'hand_red': [], 'obj_blue': [], 'obj_red': []}
             self.redraw_clicked_positions()
 
     def draw_star(self, draw, center, color, size=10):
@@ -120,8 +145,18 @@ class ImageBrowser:
             img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="blue")
             # self.draw_star(img_draw, (x, y), color="blue")
 
-        # Draw all stored red positions
+        # Draw all stored hand_red positions
         for (x, y) in self.clicked_positions[img_path]['hand_red']:
+            img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="red")
+            # self.draw_star(img_draw, (x, y), color="red")
+
+        # Draw all stored obj_blue positions
+        for (x, y) in self.clicked_positions[img_path]['obj_blue']:
+            img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="blue")
+            # self.draw_star(img_draw, (x, y), color="blue")
+
+        # Draw all stored obj_red positions
+        for (x, y) in self.clicked_positions[img_path]['obj_red']:
             img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="red")
             # self.draw_star(img_draw, (x, y), color="red")
 
@@ -156,7 +191,7 @@ class ImageBrowser:
             
             # Initialize position lists if not already done
             if img_path not in self.clicked_positions:
-                self.clicked_positions[img_path] = {'hand_blue': [], 'hand_red': []}
+                self.clicked_positions[img_path] = {'hand_blue': [], 'hand_red': [], 'obj_blue': [], 'obj_red': []}
 
             # Add the position to the list based on the current mode
             if self.remove_hand_mode:
@@ -164,12 +199,20 @@ class ImageBrowser:
             elif self.hand_select_mode:
                 self.clicked_positions[img_path]['hand_blue'].append((orig_x, orig_y))
 
+            elif self.remove_obj_mode:
+                self.clicked_positions[img_path]['obj_red'].append((orig_x, orig_y))   
+            elif self.obj_select_mode:
+                self.clicked_positions[img_path]['obj_blue'].append((orig_x, orig_y))
+
             # Draw all dots
             self.redraw_clicked_positions()
 
             # Show the coordinates of all clicked pixels
             coords_text = "\n".join([f"hand_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_blue']] +
-                                    [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']])
+                                    [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']] +
+                                    [f"obj_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_blue']] +
+                                    [f"obj_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_red']] 
+                                    )
             self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
 
     def on_image_right_click(self, event):
@@ -181,7 +224,10 @@ class ImageBrowser:
                 self.clicked_positions[img_path]['hand_red'].pop()
                 self.redraw_clicked_positions()
                 coords_text = "\n".join([f"hand_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_blue']] +
-                                        [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']])
+                                        [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']] +
+                                        [f"obj_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_blue']] +
+                                        [f"obj_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_red']] 
+                                        )
                 self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
 
             elif self.hand_select_mode and self.clicked_positions.get(img_path, {}).get('hand_blue'):
@@ -189,9 +235,33 @@ class ImageBrowser:
                 self.clicked_positions[img_path]['hand_blue'].pop()
                 self.redraw_clicked_positions()
                 coords_text = "\n".join([f"hand_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_blue']] +
-                                        [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']])
+                                        [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']] +
+                                        [f"obj_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_blue']] +
+                                        [f"obj_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_red']] 
+                                        )
+                self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
+
+            elif self.remove_obj_mode and self.clicked_positions.get(img_path, {}).get('obj_red'):
+                # Remove the last red clicked position
+                self.clicked_positions[img_path]['obj_red'].pop()
+                self.redraw_clicked_positions()
+                coords_text = "\n".join([f"hand_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_blue']] +
+                                        [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']] +
+                                        [f"obj_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_blue']] +
+                                        [f"obj_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_red']] 
+                                        )
                 self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
                 
+            elif self.obj_select_mode and self.clicked_positions.get(img_path, {}).get('obj_blue'):
+                # Remove the last blue clicked position
+                self.clicked_positions[img_path]['obj_blue'].pop()
+                self.redraw_clicked_positions()
+                coords_text = "\n".join([f"hand_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_blue']] +
+                                        [f"hand_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['hand_red']] +
+                                        [f"obj_blue: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_blue']] +
+                                        [f"obj_red: ({px}, {py})" for px, py in self.clicked_positions[img_path]['obj_red']] 
+                                        )
+                self.coord_label.config(text=f"Clicked Coordinates:\n{coords_text}")
 # Set up the main application window
 root = tk.Tk()
 app = ImageBrowser(root)
