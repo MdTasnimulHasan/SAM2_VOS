@@ -142,13 +142,13 @@ class ImageBrowser:
 
         # Draw all stored hand_blue positions
         for (x, y) in self.clicked_positions[img_path]['hand_blue']:
-            img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="blue")
-            # self.draw_star(img_draw, (x, y), color="blue")
+            # img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="blue")
+            self.draw_star(img_draw, (x, y), color="blue")
 
         # Draw all stored hand_red positions
         for (x, y) in self.clicked_positions[img_path]['hand_red']:
-            img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="red")
-            # self.draw_star(img_draw, (x, y), color="red")
+            # img_draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="red")
+            self.draw_star(img_draw, (x, y), color="red")
 
         # Draw all stored obj_blue positions
         for (x, y) in self.clicked_positions[img_path]['obj_blue']:
