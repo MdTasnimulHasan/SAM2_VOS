@@ -76,40 +76,47 @@ frame_names = [
     if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
 ]
 frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
-
+print(frame_names) # ['00000.jpg', '00001.jpg', '00002.jpg', '00003.jpg',...|
 
 #%%
 # for each new directory when opened in browser
-
+import shutil
 import json
-def save_image_names_to_json(folder_path, output_json_file):
-    # Supported image file extensions
-    supported_extensions = (".jpg", ".jpeg", ".JPG", ".JPEG")
-
-    # Dictionary to store image data
-    image_data = {}
-
+def save_image_names_to_json(folder_path, annotation_foldername):
+   
     # Iterate over all files in the folder
     for img_id in sorted(os.listdir(folder_path)):
-        image_data[img_id] = {"hand": "", "obj": ""}  # Initialize with empty strings or default values
+
+        # Dictionary to store image data
+        image_data = {}
+        image_data[img_id] = {"hand": "", "obj": ""} # Initialize with empty strings or default values
+        img_id_base = img_id.split('.')[0]
+        img_id_json = img_id_base + '.json' 
+        anntation_json_file = os.path.join(annotation_foldername, img_id_json)
+
+        if os.path.exists(anntation_json_file ):
+            os.remove(anntation_json_file)
+
+        with open(anntation_json_file, 'w') as json_file:
+            json.dump(image_data, json_file, indent=4)
     print(image_data)
     # Save the image data to a JSON file
 
-    if os.path.exists(output_json_file):
-        os.remove(output_json_file)
-    
-    with open(output_json_file, 'w') as json_file:
-        json.dump(image_data, json_file, indent=4)
 
-# Example usage
 annotation_savefolder_path = '/home/mdxuser/segment-anything-2/sam2_gui_annoatation'  # Replace with your folder path
 if not os.path.exists(annotation_savefolder_path):
     os.mkdir(annotation_savefolder_path)
 
-browser_foldername = os.path.basename(video_dir)    
-annotation_json_filename = browser_foldername  + '.json'  # Replace with your desired JSON file name
-annotation_json_filepath = os.path.join(annotation_savefolder_path, annotation_json_filename)
-save_image_names_to_json(video_dir, annotation_json_filepath)
+dataset_foldername = os.path.basename(video_dir) 
+annotation_dataset_foldername = os.path.join(annotation_savefolder_path, dataset_foldername )  
+
+# if the current annotation folder for dataset folder to be annotated exists then remove and create new one
+if os.path.exists(annotation_dataset_foldername):
+    shutil.rmtree(annotation_dataset_foldername)
+os.mkdir(annotation_dataset_foldername)
+
+save_image_names_to_json(video_dir, annotation_dataset_foldername)
+
 
 # initiate inference state after for browser folder
 inference_state = predictor.init_state(video_path=video_dir)
@@ -122,11 +129,15 @@ predictor.reset_state(inference_state)
 prompts = {} 
 # add the first object
 ann_frame_idx = 10  # the frame index we interact with
+
+###
+# hand
+###
 ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
 
 # Let's add a 2nd negative click at (x, y) = (275, 175) to refine the first object
 # sending all clicks (and their labels) to `add_new_points_or_box`
-points = np.array([[200, 300], [275, 175]], dtype=np.float32)
+points = np.array([[250, 300], [280, 250]], dtype=np.float32)
 # for labels, `1` means positive click and `0` means negative click
 labels = np.array([1, 0], np.int32)
 prompts[ann_obj_id] = points, labels
@@ -139,21 +150,23 @@ _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
 )
 
 # show the results on the current (interacted) frame
+'''
 plt.figure(figsize=(9, 6))
 plt.title(f"frame {ann_frame_idx}")
 plt.imshow(Image.open(os.path.join(video_dir, frame_names[ann_frame_idx])))
 for i, out_obj_id in enumerate(out_obj_ids):
     # show_points(*prompts[out_obj_id], plt.gca())
     show_mask((out_mask_logits[i] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_id)
-
-
-
+'''
+###
+# object
+###
 
 ann_obj_id = 2  # give a unique id to each object we interact with (it can be any integers)
 
 # Let's now move on to the second object we want to track (giving it object id `3`)
 # with a positive click at (x, y) = (400, 150)
-points = np.array([[400, 150]], dtype=np.float32)
+points = np.array([[350, 200]], dtype=np.float32)
 # for labels, `1` means positive click and `0` means negative click
 labels = np.array([1], np.int32)
 prompts[ann_obj_id] = points, labels
@@ -168,34 +181,45 @@ _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
 )
 
 # show the results on the current (interacted) frame on all objects
-plt.figure(figsize=(9, 6))
+plt.figure(figsize=(10, 6))
 plt.title(f"frame {ann_frame_idx}")
 plt.imshow(Image.open(os.path.join(video_dir, frame_names[ann_frame_idx])))
 for i, out_obj_id in enumerate(out_obj_ids):
     show_points(*prompts[out_obj_id], plt.gca())
     show_mask((out_mask_logits[i] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_id)
 
-print("out_obj_ids: ", out_obj_ids) # len 2, value [1,2]
-print((out_mask_logits[0] > 0.0).cpu().numpy())
-'''
-[[[False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]
-  ...
-  [False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]]]
-'''
-print((out_mask_logits[1] > 0.0).cpu().numpy())
-'''
-[[[False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]
-  ...
-  [False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]]]
-'''
+# print("out_obj_ids: ", out_obj_ids) # len 2, value [1,2]
+# print((out_mask_logits[0] > 0.0).cpu().numpy())
+# print((out_mask_logits[0] > 0.0).cpu().numpy().shape) #  (1, 540, 960)
+
+### !!!! need to save the json file as it7ll be used fo showing modified image in gui
+refined_data = {}
+refined_img_id = frame_names[ann_frame_idx]
+print(refined_img_id)
+
+refined_data[refined_img_id] = {"hand": (out_mask_logits[0] > 0.0).cpu().numpy().tolist(), 
+                      "obj": (out_mask_logits[1] > 0.0).cpu().numpy().tolist()
+                      }
+
+print(type(refined_data))
+print(refined_data[refined_img_id]["hand"])
+
+def replace_json_file(current_annotation_dataset_folder, new_segmentation_data):
+
+    replace_json_key = list(new_segmentation_data.keys())[0]
+    replace_json_filename = replace_json_key.split('.')[0] + '.json'
+    # print(json_key, json_filename)
+    replace_jason_filepath = os.path.join(current_annotation_dataset_folder, replace_json_filename)
+    # print(replace_jason_filepath)
+
+    if os.path.exists(replace_jason_filepath):
+        os.remove(replace_jason_filepath)
+    with open(replace_jason_filepath, 'w') as json_file:
+        json.dump(new_segmentation_data, json_file, separators=(',', ':'), indent=None)
+
+    
+replace_json_file(annotation_dataset_foldername, refined_data)
+
 #%%
 # propagrate through the video for new inputs
 # run propagation throughout the video and collect the results in a dict
@@ -206,58 +230,56 @@ for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(
         for i, out_obj_id in enumerate(out_obj_ids)
     }
 #%%
+
+def get_shape(lst):
+    if not isinstance(lst, list) or not lst:
+        return []
+    
+    shape = []
+    current_level = lst
+    
+    while isinstance(current_level, list):
+        shape.append(len(current_level))
+        if len(current_level) > 0:
+            current_level = current_level[0]
+        else:
+            break
+    
+    return shape
+
 print(len(video_segments)) # 190 from 10-199
-print(video_segments[10][1])
-'''
-[[[False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]
-  ...
-  [False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]]]
-  '''
-print(video_segments[10][2])
-'''
-[[[False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]
-  ...
-  [False False False ... False False False]
-  [False False False ... False False False]
-  [False False False ... False False False]]]
-'''
-#%%
-# save data in the json file
-json_file_path = 'path/to/your/file.json'
 
+converted_data = video_segments[10][1].tolist()
+print(get_shape(converted_data))
+
+#%%
+# annotation_json_filepath
 # New values for "hand" and "obj"
-new_values = {
-    "00000.jpg": {"hand": "new_hand_value_1", "obj": "new_obj_value_1"},
-    "00001.jpg": {"hand": "new_hand_value_2", "obj": "new_obj_value_2"},
-    "00002.jpg": {"hand": "new_hand_value_3", "obj": "new_obj_value_3"},
-    "00003.jpg": {"hand": "new_hand_value_4", "obj": "new_obj_value_4"},
-    "00004.jpg": {"hand": "new_hand_value_5", "obj": "new_obj_value_5"}
-}
-
-# Load JSON data from the file
-with open(json_file_path, 'r') as file:
-    data = json.load(file)
-
-# Update the values
-for img_name, values in new_values.items():
-    if img_name in data:
-        data[img_name]['hand'] = values['hand']
-        data[img_name]['obj'] = values['obj']
-
-# Save the updated JSON data back to the file
-with open(json_file_path, 'w') as file:
-    json.dump(data, file, indent=4)
-
-print("JSON file updated successfully.")
+new_segmentation_json = {}
+for propagate_idx in range (ann_frame_idx, len(frame_names), 1):
+    propagate_img_id = frame_names[propagate_idx]
+    new_segmentation_json[propagate_img_id] = {"hand": video_segments[propagate_idx][1].tolist(), "obj": video_segments[propagate_idx][2].tolist()} 
+# print(new_segmentation_json.keys()) # dict_keys(['00010.jpg', '00011.jpg', '00012.jpg', '00013.jpg', '00014.jpg', '00015.jpg', '00016.jpg', '00017.jpg', '00018.jpg',...]
+print(len(new_segmentation_json))
 
 #%%
-# load img with data from json file and show segmentation
+# load json data
+with open(annotation_json_filepath, 'r') as file:
+    loaded_json_data = json.load(file)
+# Print the loaded data to verify
+print(len(loaded_json_data))
+print(loaded_json_data['00199.jpg'])
+#%%
+# replace json value
+for img_id, new_data in new_segmentation_json.items():
+    loaded_json_data[img_id] = new_data
+    print(loaded_json_data[img_id])
+    break
+#%%
+# save json value
+with open(annotation_json_filepath, 'w') as file:
+    json.dump(loaded_json_data, file, indent=4)
+print("JSON file updated successfully.")
 #%%
 # render the segmentation results every few frames
 vis_frame_stride = 30
