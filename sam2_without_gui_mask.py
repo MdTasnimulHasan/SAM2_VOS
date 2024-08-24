@@ -234,16 +234,3 @@ for _, key in enumerate(video_segments.keys()):
     obj_mask_nparray = (refined_data[refined_img_id]["obj"]* 255).astype(np.uint8)
     obj_mask_binary_image = Image.fromarray(obj_mask_nparray[0])
     obj_mask_binary_image.save(os.path.join(obj_mask_folderpath, refined_mask_id))
-#%%
-# render the segmentation results every few frames
-vis_frame_stride = 30
-plt.close("all")
-for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
-    plt.figure(figsize=(6, 4))
-    plt.title(f"frame {out_frame_idx}")
-    plt.imshow(Image.open(os.path.join(video_dir, frame_names[out_frame_idx])))
-    for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-        show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
-
-
-# %%
