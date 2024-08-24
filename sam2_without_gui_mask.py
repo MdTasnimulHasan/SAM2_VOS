@@ -181,19 +181,28 @@ for i, out_obj_id in enumerate(out_obj_ids):
 # print((out_mask_logits[0] > 0.0).cpu().numpy())
 # print((out_mask_logits[0] > 0.0).cpu().numpy().shape) #  (1, 540, 960)
 
-### !!!! need to save the json file as it7ll be used fo showing modified image in gui
+### !!!! save the mask file
+
 refined_data = {}
 refined_img_id = frame_names[ann_frame_idx]
-print(refined_img_id)
+# print(refined_img_id)
 
-refined_data[refined_img_id] = {"hand": (out_mask_logits[0] > 0.0).cpu().numpy().tolist(), 
-                      "obj": (out_mask_logits[1] > 0.0).cpu().numpy().tolist()
+refined_data[refined_img_id] = {"hand": (out_mask_logits[0] > 0.0).cpu().numpy(), 
+                      "obj": (out_mask_logits[1] > 0.0).cpu().numpy()
                       }
 
-print(type(refined_data))
-print(refined_data[refined_img_id]["hand"])
+# print(type(refined_data))
+# print(type(refined_data[refined_img_id]["hand"]))
+
+refined_mask_id = os.path.splitext(refined_img_id)[0] + '.png'
+hand_mask_nparray = (refined_data[refined_img_id]["hand"]* 255).astype(np.uint8)
+hand_mask_binary_image = Image.fromarray(hand_mask_nparray[0])
+hand_mask_binary_image.save(os.path.join(hand_mask_folderpath, refined_mask_id))
 
 
+obj_mask_nparray = (refined_data[refined_img_id]["obj"]* 255).astype(np.uint8)
+obj_mask_binary_image = Image.fromarray(obj_mask_nparray[0])
+obj_mask_binary_image.save(os.path.join(obj_mask_folderpath, refined_mask_id))
 #%%
 # propagrate through the video for new inputs
 # run propagation throughout the video and collect the results in a dict
@@ -204,56 +213,27 @@ for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(
         for i, out_obj_id in enumerate(out_obj_ids)
     }
 #%%
+# save the propagated masks
+# print(len(video_segments)) # 190
+# print(video_segments.keys()) # dict_keys([10, 11, 12, 13, 14, 15, 16
+for _, key in enumerate(video_segments.keys()):
 
-def get_shape(lst):
-    if not isinstance(lst, list) or not lst:
-        return []
-    
-    shape = []
-    current_level = lst
-    
-    while isinstance(current_level, list):
-        shape.append(len(current_level))
-        if len(current_level) > 0:
-            current_level = current_level[0]
-        else:
-            break
-    
-    return shape
+    refined_data = {}
+    refined_img_id = frame_names[key] # 00010.jpg
+    refined_data[refined_img_id] = {"hand": video_segments[key][1], 
+                      "obj": video_segments[key][2]
+                      }
 
-print(len(video_segments)) # 190 from 10-199
+    refined_mask_id = os.path.splitext(refined_img_id)[0] + '.png'
 
-converted_data = video_segments[10][1].tolist()
-print(get_shape(converted_data))
+    hand_mask_nparray = (refined_data[refined_img_id]["hand"]* 255).astype(np.uint8)
+    hand_mask_binary_image = Image.fromarray(hand_mask_nparray[0])
+    hand_mask_binary_image.save(os.path.join(hand_mask_folderpath, refined_mask_id))
 
-#%%
-# annotation_json_filepath
-# New values for "hand" and "obj"
-new_segmentation_json = {}
-for propagate_idx in range (ann_frame_idx, len(frame_names), 1):
-    propagate_img_id = frame_names[propagate_idx]
-    new_segmentation_json[propagate_img_id] = {"hand": video_segments[propagate_idx][1].tolist(), "obj": video_segments[propagate_idx][2].tolist()} 
-# print(new_segmentation_json.keys()) # dict_keys(['00010.jpg', '00011.jpg', '00012.jpg', '00013.jpg', '00014.jpg', '00015.jpg', '00016.jpg', '00017.jpg', '00018.jpg',...]
-print(len(new_segmentation_json))
 
-#%%
-# load json data
-with open(annotation_json_filepath, 'r') as file:
-    loaded_json_data = json.load(file)
-# Print the loaded data to verify
-print(len(loaded_json_data))
-print(loaded_json_data['00199.jpg'])
-#%%
-# replace json value
-for img_id, new_data in new_segmentation_json.items():
-    loaded_json_data[img_id] = new_data
-    print(loaded_json_data[img_id])
-    break
-#%%
-# save json value
-with open(annotation_json_filepath, 'w') as file:
-    json.dump(loaded_json_data, file, indent=4)
-print("JSON file updated successfully.")
+    obj_mask_nparray = (refined_data[refined_img_id]["obj"]* 255).astype(np.uint8)
+    obj_mask_binary_image = Image.fromarray(obj_mask_nparray[0])
+    obj_mask_binary_image.save(os.path.join(obj_mask_folderpath, refined_mask_id))
 #%%
 # render the segmentation results every few frames
 vis_frame_stride = 30
