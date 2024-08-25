@@ -139,6 +139,10 @@ class ImageBrowser:
         self.mask_generate_button = tk.Button(self.button_frame, text="Mask Generate", command=self.sam2_mask_generate)
         self.mask_generate_button.pack(pady=5)
 
+        # create button for sam2 mask generation propagate
+        self.mask_propagate_button = tk.Button(self.button_frame, text="SAM2 Propagate ", command=self.sam2_mask_gen_propagate)
+        self.mask_propagate_button.pack(pady=5)
+
         # Create buttons and pack them in the button frame
         self.prev_button = tk.Button(self.button_frame, text="Previous", command=self.show_previous_image)
         self.prev_button.pack(pady=5)
@@ -188,7 +192,7 @@ class ImageBrowser:
         # call in each time new point input to be given
 
         predictor.reset_state(self.inference_state)
-        prompts = {} 
+        self.prompts = {} 
         # add the first object
         self.ann_frame_idx = self.current_image_index  # the frame index we interact with
 
@@ -200,40 +204,40 @@ class ImageBrowser:
         # get hand data
         hand_select_list = [list(item) for item in self.clicked_positions[img_path]['hand_blue']]
         hand_remove_list = [list(item) for item in self.clicked_positions[img_path]['hand_red']]
-        hand_points = []
-        hand_select_remove_labels = []
+        self.hand_points = []
+        self.hand_select_remove_labels = []
         for itr in range(0, len(hand_select_list),1):
-            hand_points.append(hand_select_list[itr])
-            hand_select_remove_labels.append(1)
+            self.hand_points.append(hand_select_list[itr])
+            self.hand_select_remove_labels.append(1)
         for itr in range(0, len(hand_remove_list),1):
-            hand_points.append(hand_remove_list[itr])
-            hand_select_remove_labels.append(0)
-        print(hand_points, hand_select_remove_labels)
+            self.hand_points.append(hand_remove_list[itr])
+            self.hand_select_remove_labels.append(0)
+        print(self.hand_points, self.hand_select_remove_labels)
 
 
         # get obj data
         obj_select_list = [list(item) for item in self.clicked_positions[img_path]['obj_blue']]
         obj_remove_list = [list(item) for item in self.clicked_positions[img_path]['obj_red']]
-        obj_points = []
-        obj_select_remove_labels = []
+        self.obj_points = []
+        self.obj_select_remove_labels = []
         for itr in range(0, len(obj_select_list),1):
-            obj_points.append(obj_select_list[itr])
-            obj_select_remove_labels.append(1)
+            self.obj_points.append(obj_select_list[itr])
+            self.obj_select_remove_labels.append(1)
         for itr in range(0, len(obj_remove_list),1):
-            obj_points.append(obj_remove_list[itr])
-            obj_select_remove_labels.append(0)
-        print(obj_points, obj_select_remove_labels)
+            self.obj_points.append(obj_remove_list[itr])
+            self.obj_select_remove_labels.append(0)
+        print(self.obj_points, self.obj_select_remove_labels)
 
 
         ###
         # hand
         ###
-        if len(hand_points):
+        if len(self.hand_points):
             ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
-            points = np.array(hand_points, dtype=np.float32)
+            points = np.array(self.hand_points, dtype=np.float32)
             # for labels, `1` means positive click and `0` means negative click
-            labels = np.array(hand_select_remove_labels, np.int32)
-            prompts[ann_obj_id] = points, labels
+            labels = np.array(self.hand_select_remove_labels, np.int32)
+            self.prompts[ann_obj_id] = points, labels
             _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
                 inference_state=self.inference_state,
                 frame_idx=self.ann_frame_idx,
@@ -245,12 +249,12 @@ class ImageBrowser:
         ###
         # obj
         ###
-        if len(obj_points):
+        if len(self.obj_points):
             ann_obj_id = 2  # give a unique id to each object we interact with (it can be any integers)
-            points = np.array(obj_points, dtype=np.float32)
+            points = np.array(self.obj_points, dtype=np.float32)
             # for labels, `1` means positive click and `0` means negative click
-            labels = np.array(obj_select_remove_labels, np.int32)
-            prompts[ann_obj_id] = points, labels
+            labels = np.array(self.obj_select_remove_labels, np.int32)
+            self.prompts[ann_obj_id] = points, labels
             # `add_new_points_or_box` returns masks for all objects added so far on this interacted frame
             _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
                 inference_state=self.inference_state,
@@ -272,12 +276,12 @@ class ImageBrowser:
         refined_data[refined_img_id] = {"hand": init_mask_nparray, 
                                         "obj": init_mask_nparray
                                         }
-        if len(hand_points) > 0 and len(obj_points) > 0:
+        if len(self.hand_points) > 0 and len(self.obj_points) > 0:
             refined_data[refined_img_id]["hand"] =  (out_mask_logits[0] > 0.0).cpu().numpy()[0]
             refined_data[refined_img_id]["obj"] =   (out_mask_logits[1] > 0.0).cpu().numpy()[0]
-        elif len(hand_points)> 0 and len(obj_points) == 0:
+        elif len(self.hand_points)> 0 and len(self.obj_points) == 0:
             refined_data[refined_img_id]["hand"] =  (out_mask_logits[0] > 0.0).cpu().numpy()[0]
-        elif len(hand_points) == 0 and len(obj_points) > 0:
+        elif len(self.hand_points) == 0 and len(self.obj_points) > 0:
             refined_data[refined_img_id]["obj"] =   (out_mask_logits[0] > 0.0).cpu().numpy()[0]
 
         refined_mask_id = os.path.splitext(refined_img_id)[0] + '.png'
@@ -292,7 +296,55 @@ class ImageBrowser:
 
         if self.frame_names:
             self.show_image()
-        
+
+    def sam2_mask_gen_propagate(self):
+
+        self.ann_frame_idx = self.current_image_index  # the frame index we interact with
+
+        img_path = os.path.join(self.video_dir, self.frame_names[self.current_image_index])
+        print(self.clicked_positions[img_path])  
+
+        video_segments = {}  # video_segments contains the per-frame segmentation results
+        for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(self.inference_state):
+            video_segments[out_frame_idx] = {
+                out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+                for i, out_obj_id in enumerate(out_obj_ids)
+            }
+        for _, key in enumerate(video_segments.keys()):
+
+            refined_img_id = self.frame_names[key]
+            img_width, img_height = Image.open(os.path.join(self.video_dir, refined_img_id )).size
+            print(img_width, img_height)
+            init_mask_nparray = np.zeros((img_height , img_width), dtype=np.uint8)
+
+            # print(refined_img_id)
+            refined_data = {}
+            refined_data[refined_img_id] = {"hand": init_mask_nparray, 
+                                            "obj": init_mask_nparray
+                                            }
+
+            if len(self.hand_points) > 0 and len(self.obj_points) > 0:
+                refined_data[refined_img_id]["hand"] =  video_segments[key][1]
+                refined_data[refined_img_id]["obj"] =   video_segments[key][2]
+            elif len(self.hand_points)> 0 and len(self.obj_points) == 0:
+                refined_data[refined_img_id]["hand"] =  video_segments[key][1]
+            elif len(self.hand_points) == 0 and len(self.obj_points) > 0:
+                refined_data[refined_img_id]["obj"] =   video_segments[key][2]
+
+
+            refined_mask_id = os.path.splitext(refined_img_id)[0] + '.png'
+
+            hand_mask_nparray = (refined_data[refined_img_id]["hand"]* 255).astype(np.uint8)
+            hand_mask_binary_image = Image.fromarray(hand_mask_nparray[0])
+            hand_mask_binary_image.save(os.path.join(self.hand_mask_folderpath, refined_mask_id))
+
+
+            obj_mask_nparray = (refined_data[refined_img_id]["obj"]* 255).astype(np.uint8)
+            obj_mask_binary_image = Image.fromarray(obj_mask_nparray[0])
+            obj_mask_binary_image.save(os.path.join(self.obj_mask_folderpath, refined_mask_id))
+
+        if self.frame_names:
+            self.show_image()
 
     def select_folder(self):
         folder_path = filedialog.askdirectory()
