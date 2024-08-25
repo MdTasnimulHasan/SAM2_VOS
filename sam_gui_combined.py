@@ -301,8 +301,12 @@ class ImageBrowser:
         if not self.frame_names:
             return
         
-        img_path = self.image_list[self.current_image_index]
-        img_with_dots = self.original_img.copy()
+        # img_path = self.image_list[self.current_image_index]
+        # img_with_dots = self.original_img.copy()
+
+        # changed
+        img_path = os.path.join(self.video_dir, self.frame_names[self.current_image_index])
+        img_with_dots = self.img_RGB_with_mask.copy()
         img_draw = ImageDraw.Draw(img_with_dots)
 
         # Draw all stored hand_blue positions
