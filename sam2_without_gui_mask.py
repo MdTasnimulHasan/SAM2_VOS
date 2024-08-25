@@ -107,6 +107,19 @@ obj_mask_folderpath = os.path.join(annotation_dataset_foldername, 'obj_mask')
 if not os.path.exists(obj_mask_folderpath):
     os.mkdir(obj_mask_folderpath)
 
+img_width, img_height = Image.open(os.path.join(video_dir, frame_names[0])).size
+print(img_width, img_height)
+initial_mask_array = np.zeros((img_height , img_width), dtype=np.uint8)
+# Convert the NumPy array to a PIL Image
+initial_mask_binary_img = Image.fromarray(initial_mask_array)
+
+for init_idx in range(0, len(frame_names), 1):
+    init_mask_id = frame_names[init_idx]
+    init_mask_png_filename = os.path.splitext(init_mask_id)[0] + '.png'
+
+    initial_mask_binary_img.save(os.path.join(hand_mask_folderpath, init_mask_png_filename))
+    initial_mask_binary_img.save(os.path.join(obj_mask_folderpath, init_mask_png_filename))
+
 # initiate inference state after for browser folder
 inference_state = predictor.init_state(video_path=video_dir)
 
@@ -212,7 +225,7 @@ for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(
         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
         for i, out_obj_id in enumerate(out_obj_ids)
     }
-#%%
+
 # save the propagated masks
 # print(len(video_segments)) # 190
 # print(video_segments.keys()) # dict_keys([10, 11, 12, 13, 14, 15, 16
