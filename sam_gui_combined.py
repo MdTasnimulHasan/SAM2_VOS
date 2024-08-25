@@ -100,6 +100,7 @@ class ImageBrowser:
         self.obj_select_mode = False  # Mode to select hand blue dot  pixels
         self.remove_obj_mode = False  # Mode to draw remove hand red dots
 
+
         self.clicked_positions = {}  # Dictionary to store clicked positions per image
         
         # Create a frame for the image and buttons
@@ -133,6 +134,10 @@ class ImageBrowser:
         # Create a label to show pixel coordinates
         self.coord_label = tk.Label(self.button_frame, text="", wraplength=200)
         self.coord_label.pack(pady=5)
+        
+        # create button for mask generation
+        self.mask_generate_button = tk.Button(self.button_frame, text="Mask Generate", command=self.sam2_mask_generate)
+        self.mask_generate_button.pack(pady=5)
 
         # Create buttons and pack them in the button frame
         self.prev_button = tk.Button(self.button_frame, text="Previous", command=self.show_previous_image)
@@ -177,6 +182,81 @@ class ImageBrowser:
             self.remove_obj_button.config(relief=tk.SUNKEN)
         else:
             self.remove_obj_button.config(relief=tk.RAISED)
+    
+    def sam2_mask_generate(self):
+
+        # call in each time new point input to be given
+
+        predictor.reset_state(self.inference_state)
+        prompts = {} 
+        # add the first object
+        self.ann_frame_idx = self.current_image_index  # the frame index we interact with
+
+        ###
+        # hand
+        ###
+        ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
+
+        # Let's add a 2nd negative click at (x, y) = (275, 175) to refine the first object
+        # sending all clicks (and their labels) to `add_new_points_or_box`
+        points = np.array([[250, 300], [280, 250]], dtype=np.float32)
+        # for labels, `1` means positive click and `0` means negative click
+        labels = np.array([1, 0], np.int32)
+        prompts[ann_obj_id] = points, labels
+        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+            inference_state=self.inference_state,
+            frame_idx=self.ann_frame_idx,
+            obj_id=ann_obj_id,
+            points=points,
+            labels=labels,
+        )
+
+        ###
+        # obj
+        ###
+        ann_obj_id = 2  # give a unique id to each object we interact with (it can be any integers)
+
+        # Let's now move on to the second object we want to track (giving it object id `3`)
+        # with a positive click at (x, y) = (400, 150)
+        points = np.array([[350, 200]], dtype=np.float32)
+        # for labels, `1` means positive click and `0` means negative click
+        labels = np.array([1], np.int32)
+        prompts[ann_obj_id] = points, labels
+
+        # `add_new_points_or_box` returns masks for all objects added so far on this interacted frame
+        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+            inference_state=self.inference_state,
+            frame_idx=self.ann_frame_idx,
+            obj_id=ann_obj_id,
+            points=points,
+            labels=labels,
+        )
+
+    
+        refined_data = {}
+        refined_img_id = self.frame_names[self.ann_frame_idx]
+        # print(refined_img_id)
+
+        refined_data[refined_img_id] = {"hand": (out_mask_logits[0] > 0.0).cpu().numpy(), 
+                            "obj": (out_mask_logits[1] > 0.0).cpu().numpy()
+                            }
+
+        # print(type(refined_data))
+        # print(type(refined_data[refined_img_id]["hand"]))
+
+        refined_mask_id = os.path.splitext(refined_img_id)[0] + '.png'
+        hand_mask_nparray = (refined_data[refined_img_id]["hand"]* 255).astype(np.uint8)
+        hand_mask_binary_image = Image.fromarray(hand_mask_nparray[0])
+        hand_mask_binary_image.save(os.path.join(self.hand_mask_folderpath, refined_mask_id))
+
+
+        obj_mask_nparray = (refined_data[refined_img_id]["obj"]* 255).astype(np.uint8)
+        obj_mask_binary_image = Image.fromarray(obj_mask_nparray[0])
+        obj_mask_binary_image.save(os.path.join(self.obj_mask_folderpath, refined_mask_id))
+
+        if self.frame_names:
+            self.show_image()
+        
 
     def select_folder(self):
         folder_path = filedialog.askdirectory()
