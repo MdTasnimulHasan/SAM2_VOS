@@ -192,66 +192,102 @@ class ImageBrowser:
         # add the first object
         self.ann_frame_idx = self.current_image_index  # the frame index we interact with
 
+        img_path = os.path.join(self.video_dir, self.frame_names[self.current_image_index])
+        print(self.clicked_positions[img_path])
+        # print(len(self.clicked_positions[img_path])) 
+        # {'hand_blue': [(415, 206), (283, 180)], 'hand_red': [(428, 180), (278, 144)], 'obj_blue': [(338, 353), (405, 340)], 'obj_red': [(348, 449), (432, 433)]}
+        
+        # get hand data
+        hand_select_list = [list(item) for item in self.clicked_positions[img_path]['hand_blue']]
+        hand_remove_list = [list(item) for item in self.clicked_positions[img_path]['hand_red']]
+        hand_points = []
+        hand_select_remove_labels = []
+        for itr in range(0, len(hand_select_list),1):
+            hand_points.append(hand_select_list[itr])
+            hand_select_remove_labels.append(1)
+        for itr in range(0, len(hand_remove_list),1):
+            hand_points.append(hand_remove_list[itr])
+            hand_select_remove_labels.append(0)
+        print(hand_points, hand_select_remove_labels)
+
+
+        # get obj data
+        obj_select_list = [list(item) for item in self.clicked_positions[img_path]['obj_blue']]
+        obj_remove_list = [list(item) for item in self.clicked_positions[img_path]['obj_red']]
+        obj_points = []
+        obj_select_remove_labels = []
+        for itr in range(0, len(obj_select_list),1):
+            obj_points.append(obj_select_list[itr])
+            obj_select_remove_labels.append(1)
+        for itr in range(0, len(obj_remove_list),1):
+            obj_points.append(obj_remove_list[itr])
+            obj_select_remove_labels.append(0)
+        print(obj_points, obj_select_remove_labels)
+
+
         ###
         # hand
         ###
-        ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
-
-        # Let's add a 2nd negative click at (x, y) = (275, 175) to refine the first object
-        # sending all clicks (and their labels) to `add_new_points_or_box`
-        points = np.array([[250, 300], [280, 250]], dtype=np.float32)
-        # for labels, `1` means positive click and `0` means negative click
-        labels = np.array([1, 0], np.int32)
-        prompts[ann_obj_id] = points, labels
-        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
-            inference_state=self.inference_state,
-            frame_idx=self.ann_frame_idx,
-            obj_id=ann_obj_id,
-            points=points,
-            labels=labels,
-        )
+        if len(hand_points):
+            ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
+            points = np.array(hand_points, dtype=np.float32)
+            # for labels, `1` means positive click and `0` means negative click
+            labels = np.array(hand_select_remove_labels, np.int32)
+            prompts[ann_obj_id] = points, labels
+            _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+                inference_state=self.inference_state,
+                frame_idx=self.ann_frame_idx,
+                obj_id=ann_obj_id,
+                points=points,
+                labels=labels,
+            )
 
         ###
         # obj
         ###
-        ann_obj_id = 2  # give a unique id to each object we interact with (it can be any integers)
+        if len(obj_points):
+            ann_obj_id = 2  # give a unique id to each object we interact with (it can be any integers)
+            points = np.array(obj_points, dtype=np.float32)
+            # for labels, `1` means positive click and `0` means negative click
+            labels = np.array(obj_select_remove_labels, np.int32)
+            prompts[ann_obj_id] = points, labels
+            # `add_new_points_or_box` returns masks for all objects added so far on this interacted frame
+            _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+                inference_state=self.inference_state,
+                frame_idx=self.ann_frame_idx,
+                obj_id=ann_obj_id,
+                points=points,
+                labels=labels,
+            )
 
-        # Let's now move on to the second object we want to track (giving it object id `3`)
-        # with a positive click at (x, y) = (400, 150)
-        points = np.array([[350, 200]], dtype=np.float32)
-        # for labels, `1` means positive click and `0` means negative click
-        labels = np.array([1], np.int32)
-        prompts[ann_obj_id] = points, labels
-
-        # `add_new_points_or_box` returns masks for all objects added so far on this interacted frame
-        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
-            inference_state=self.inference_state,
-            frame_idx=self.ann_frame_idx,
-            obj_id=ann_obj_id,
-            points=points,
-            labels=labels,
-        )
-
-    
-        refined_data = {}
+        
+        
         refined_img_id = self.frame_names[self.ann_frame_idx]
+        img_width, img_height = Image.open(os.path.join(self.video_dir, self.frame_names[self.ann_frame_idx])).size
+        print(img_width, img_height)
+        init_mask_nparray = np.zeros((img_height , img_width), dtype=np.uint8)
+
         # print(refined_img_id)
-
-        refined_data[refined_img_id] = {"hand": (out_mask_logits[0] > 0.0).cpu().numpy(), 
-                            "obj": (out_mask_logits[1] > 0.0).cpu().numpy()
-                            }
-
-        # print(type(refined_data))
-        # print(type(refined_data[refined_img_id]["hand"]))
+        refined_data = {}
+        refined_data[refined_img_id] = {"hand": init_mask_nparray, 
+                                        "obj": init_mask_nparray
+                                        }
+        if len(hand_points) > 0 and len(obj_points) > 0:
+            refined_data[refined_img_id]["hand"] =  (out_mask_logits[0] > 0.0).cpu().numpy()[0]
+            refined_data[refined_img_id]["obj"] =   (out_mask_logits[1] > 0.0).cpu().numpy()[0]
+        elif len(hand_points)> 0 and len(obj_points) == 0:
+            refined_data[refined_img_id]["hand"] =  (out_mask_logits[0] > 0.0).cpu().numpy()[0]
+        elif len(hand_points) == 0 and len(obj_points) > 0:
+            refined_data[refined_img_id]["obj"] =   (out_mask_logits[0] > 0.0).cpu().numpy()[0]
 
         refined_mask_id = os.path.splitext(refined_img_id)[0] + '.png'
         hand_mask_nparray = (refined_data[refined_img_id]["hand"]* 255).astype(np.uint8)
-        hand_mask_binary_image = Image.fromarray(hand_mask_nparray[0])
+        hand_mask_binary_image = Image.fromarray(hand_mask_nparray)
         hand_mask_binary_image.save(os.path.join(self.hand_mask_folderpath, refined_mask_id))
 
 
         obj_mask_nparray = (refined_data[refined_img_id]["obj"]* 255).astype(np.uint8)
-        obj_mask_binary_image = Image.fromarray(obj_mask_nparray[0])
+        obj_mask_binary_image = Image.fromarray(obj_mask_nparray)
         obj_mask_binary_image.save(os.path.join(self.obj_mask_folderpath, refined_mask_id))
 
         if self.frame_names:
