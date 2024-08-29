@@ -82,6 +82,9 @@ def show_RGB_mask(rgb_image, mask1, mask2):
 
 class ImageBrowser:
     def __init__(self, root):
+
+        self.annotation_savefolder_path = '/home/mdxuser/segment-anything-2/sam2_gui_annoatation'  # Replace with your folder path
+
         self.root = root
         self.root.title("Image Browser")
         
@@ -355,11 +358,13 @@ class ImageBrowser:
             
             # added
             # print(self.image_list)
+
             self.frame_names = [
                 p for p in os.listdir(self.video_dir)
                 if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
             ]
             self.frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
+            # self.frame_names = self.image_list
             print(self.frame_names)
             print(self.image_list)
 
@@ -367,7 +372,6 @@ class ImageBrowser:
             self.ann_frame_idx = self.current_image_index
 
             # added
-            self.annotation_savefolder_path = '/home/mdxuser/segment-anything-2/sam2_gui_annoatation'  # Replace with your folder path
             if not os.path.exists(self.annotation_savefolder_path):
                 os.mkdir(self.annotation_savefolder_path)
 
@@ -388,6 +392,11 @@ class ImageBrowser:
             self.obj_mask_folderpath = os.path.join(self.annotation_dataset_foldername, 'obj_mask')
             if not os.path.exists(self.obj_mask_folderpath):
                 os.mkdir(self.obj_mask_folderpath)
+
+            # obj mask directory
+            self.viz_folderpath = os.path.join(self.annotation_dataset_foldername, 'viz')
+            if not os.path.exists(self.viz_folderpath):
+                os.mkdir(self.viz_folderpath)
 
             img_width, img_height = Image.open(os.path.join(self.video_dir, self.frame_names[0])).size
             # print(img_width, img_height)
@@ -439,6 +448,7 @@ class ImageBrowser:
             # load the RGB image with mask
             self.img_RGB_with_mask = show_RGB_mask(self.original_img, self.hand_mask_array, self.obj_mask_array)
 
+            self.img_RGB_with_mask.save(os.path.join(self.viz_folderpath, current_mask_id ))
             # self.original_img = self.original_img.resize((512, 512), Image.LANCZOS)
 
             self.img = self.img_RGB_with_mask.copy()
@@ -602,7 +612,7 @@ class ImageBrowser:
 # Set up the main application window
 root = tk.Tk()
 app = ImageBrowser(root)
-root.geometry("1080x1080")  # Adjust size as needed
+root.geometry("800x800")  # Adjust size as needed
 root.mainloop()
 
 
